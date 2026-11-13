@@ -1,0 +1,31 @@
+{
+  "folder": "11-Mutation",
+  "description": "生成两端吉他音色、连续渐变，并收藏喜欢的结果。",
+  "app": {
+    "file": "App.rpk",
+    "id": "org.resona.demo.mutation",
+    "name": "Mutation",
+    "version": "0.2.1",
+    "kind": 1,
+    "bytes": 159636,
+    "sha256": "4781995c817d8ed000c263f3c1da715daa9156fa20a7eb5b3540db4753b294f3",
+    "crc32": 3071110257
+  },
+  "audio_packs": [
+    {
+      "file": "Audio-Pack.rpk",
+      "id": "org.resona.demo.mutation.dsp",
+      "name": "Mutation DSP",
+      "version": "0.1.1",
+      "kind": 0,
+      "bytes": 3504,
+      "sha256": "f06e5995569e120ca4e15ab9b07849355a2b19da7e7eb83e4ad88e55a8db2435",
+      "crc32": 527165349
+    }
+  ],
+  "source": "source/",
+  "cover": "界面.png",
+  "license_file_present": true,
+  "host_build_check": "passed",
+  "community_upload": "not sent"
+}

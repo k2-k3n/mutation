@@ -1,0 +1,10 @@
+{
+  "name": "Mutation DSP",
+  "id": "org.resona.demo.mutation.dsp",
+  "version": "0.1.1",
+  "api": 1,
+  "description": "Input-derived mono guitar tone morphing: drive, tone, chorus and echo.",
+  "sources": [
+    "src/main.cpp"
+  ]
+}

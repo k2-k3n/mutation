@@ -1,0 +1,115 @@
+# Mutation
+
+![Mutation](community-cover.png)
+
+听听 A 音色，再短按下方旋钮抽一个新的 B。转旋钮找两者之间喜欢的位置，长按就能收藏。
+
+## 配套音频包
+
+先安装音频包，再安装 App。
+
+- Mutation DSP `org.resona.demo.mutation.dsp` 0.1.1
+
+## 两个编码器
+
+| 页面／模式 | 上方旋转 | 上方短按 | 上方长按 | 下方旋转 | 下方短按 | 下方长按／按住 |
+| --- | --- | --- | --- | --- | --- | --- |
+| Mutation | 轮选已收藏音色；未收藏时无作用 | 干声对比开／关 | 回到 A 端并退出干声对比 | 在 A、B 两个音色之间渐变 | 生成新的 B 音色 | 长按收藏当前音色，最多 8 个 |
+
+## 项目详细说明
+
+# Mutation
+
+Breed guitar tones. Each proposal keeps the tone you hear as endpoint A and grows a new random mutant
+as endpoint B; the big knob morphs between them, and the ones you like are kept as favourites. The
+sound is the nested `dsp/` pack (**Mutation DSP**); the App is the cut-paper screen around it.
+
+## Controls
+
+| Control | Turn | Click | Long press |
+|---|---|---|---|
+| SELECTOR (top) | recall a favourite (does nothing until one is kept) | dry compare on/off | back to endpoint A, dry compare off |
+| CUSTOMIZE (big) | Blend A to B, 3 % per detent | propose a new mutant | keep the current tone as a favourite |
+
+- **Propose**: the tone you hear becomes A, a new mutant becomes B and Blend returns to 0, so the sound
+  does not jump. Parameters slew inside the DSP.
+- **Keep**: stores up to eight favourites; a ninth drops the oldest. Recalling one morphs to it at Blend 100.
+
+Favourites are written on Keep. The session (A, B, Blend, strain number, random seed and LEVEL) is saved
+1.5 s after the last change, so a reboot resumes the same sound and new proposals do not repeat. A failed
+write shows NOT SAVED.
+
+## The screen
+
+- **Bottom left**: Blend, with the dot arc around the bud showing the same value. DRY above it while
+  comparing the dry guitar.
+- **Top right**: the strain number (counts up with each proposal), or the favourite's number after a recall.
+- **KEPT n / 8** after a keep.
+- **The bud** sways with your playing.
+- **Status line**: INSTALL MUTATION DSP IN LAB until the pack is in the Box's library; CPU LIMIT if the OS
+  bypasses the DSP for its CPU budget (the App rebuilds its audio after 2 s, then 10 s, then 30 s).
+
+## Controller
+
+`controller/` holds a Web controller (the Resona Box website's look) and a Mobile one (the Creator Lab app's look). Any MIDI controller can play Mutation too: every control is one CC on channel 1, over USB, Bluetooth or the MIDI jack. CC 119 asks the App for every value; it then reports changes, including ones made with the knobs, and the input and output meters on CC 116 and 117.
+
+The controllers add four hold pads and an XY surface (Blend across, the mutant's drive up), and reach the mutant's (endpoint B's) drive, tone, mod and echo and LEVEL, which the knobs don't. Editing the mutant changes the sound at once when Blend is above 0.
+
+| CC | Control | Values |
+|---|---|---|
+| 20 | Blend | 0 to 127: 0 to 100 % |
+| 21 | Dry compare | 0 off, 1 on |
+| 22 | Favourite | 0 none, 1 to 8 recall that favourite (values past the kept count are refused) |
+| 23 | Mutant drive | 0 to 127: 0 to 100 |
+| 24 | Mutant tone | 0 to 127: 0 to 100 |
+| 25 | Mutant mod | 0 to 127: 0 to 100 |
+| 26 | Mutant echo | 0 to 127: 0 to 100 |
+| 27 | LEVEL | 0 to 127: 0 to 100 (default 84) |
+| 28 | Strain (App to controller) | 0 to 127: strain 0 to 99 |
+| 29 | Kept (App to controller) | 0 to 127: 0 to 8 favourites |
+| 30 | A (hold) | 127 press, 0 release: hear endpoint A (Blend 0) |
+| 31 | B (hold) | 127 press, 0 release: hear endpoint B (Blend 100) |
+| 32 | SMEAR (hold) | 127 press, 0 release: both endpoints' mod to at least 90 and echo to at least 95 |
+| 33 | DRY (hold) | 127 press, 0 release: the dry guitar |
+| 34 | NEW | 127: propose a new tone (big knob click) |
+| 35 | KEEP | 127: keep the current tone (big knob hold) |
+| 36 | BACK | 127: back to endpoint A (top knob hold) |
+
+## DSP: Mutation DSP
+
+    input -> drive (soft clip, level make-up) -> one-pole tone -> triangle chorus
+          -> filtered feedback echo -> DC block -> LEVEL        BYPASS: the dry guitar
+
+Mono, 48 kHz. A and B are two sets of drive, tone, mod and echo; BLEND mixes them. The make-up gain keeps
+every proposal within about 1 dB of the dry guitar at normal pickup level. The echo line is a 128 KiB
+PSRAM buffer.
+
+| Parameter | Range | Set by the App |
+|---|---|---|
+| BLEND | 0 to 100 % | CUSTOMIZE turn, controller CC 20; the A and B pads force 0 or 100 |
+| A_DRIVE, A_TONE, A_MOD, A_ECHO | 0 to 100 % | the tone heard when proposing or recalling |
+| B_DRIVE, B_TONE, B_MOD, B_ECHO | 0 to 100 % | a new mutant (12 to 96 each), a recalled favourite, or controller CC 23 to 26 |
+| BYPASS | 0 or 1 | dry compare (SELECTOR click, CC 21, DRY pad) |
+| LEVEL | 0 to 100 % | 84, or controller CC 27 |
+
+The App builds its own audio graph (Guitar -> Mutation DSP -> Output and Capture; USB and Bluetooth to
+Output), so the Box's presets are suspended while it runs. No preset slot is written.
+
+## Build
+
+    resona-lab check dsp
+    resona-lab pack build dsp
+    resona-lab pack install dsp/build/*.rpk     # store the pack in the Box's library first
+    resona-lab app build .
+    resona-lab app install .
+    python3 tools/encode_art.py                 # regenerate src/art.h from assets/ (needs Pillow)
+
+`tests/app_behavior.cpp` and `tests/dsp_behavior.cpp` are host tests of the App's favourites and the DSP.
+The encoder-emulating CCs on MIDI channel 16 and the screen capture (`src/demo_capture.h`) are compiled in
+only with `-DRESONA_DEMO_BENCH`.
+
+Code and artwork: MIT, see LICENSE. Geist font: SIL Open Font License, see `assets/Geist-OFL.txt`.
+
+## 开机动画
+
+淡紫底上，中央的绿芽张开，露出暖橙色内叶。 首次运行时保存到 Resona Box，下次开机播放。

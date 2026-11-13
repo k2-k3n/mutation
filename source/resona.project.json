@@ -1,0 +1,11 @@
+{
+  "name": "Mutation",
+  "id": "org.resona.demo.mutation",
+  "version": "0.2.1",
+  "api": 1,
+  "description": "",
+  "kind": "app",
+  "sources": [
+    "src/app.cpp"
+  ]
+}
