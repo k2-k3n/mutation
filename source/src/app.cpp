@@ -6,6 +6,7 @@
 #include "splash_data.h"
 #include "demo_capture.h"
 #include <resona/ui.h>
+#include <resona/math.h>
 #include "art.h"
 #include "art_words.h"
 #include "own_audio.h"
@@ -21,7 +22,7 @@ struct Session{uint32_t magic,size;Tone a,b;int32_t blend,strain;uint32_t seed;i
 constexpr uint32_t kSessionAt=160,kSessionMagicV1=0x4d555332,kSessionMagic=0x4d555333;
 // The controllers' MIDI map: CC on channel 1 (controller/shared/profile.js says the same).
 enum{CC_BLEND=20,CC_DRY,CC_FAV,CC_DRIVE,CC_TONE,CC_MOD,CC_ECHO,CC_LEVEL,CC_STRAIN,CC_KEPT,CC_PARENT=30,CC_MUTANT,CC_SMEAR,CC_HOLD_DRY,CC_NEW,CC_KEEP,CC_BACK};
-struct State{Tone a,b;Saved saved;int blend,strain,compare,ready,error,stage,scan,count,down[2],held[2],cursor;uint32_t now,nextSetup,keepUntil;float activity;uint32_t changed,saveFailUntil;int sessionDirty;trip_guard::Guard trip;
+struct State{Tone a,b;Saved saved;int blend,strain,compare,ready,error,stage,scan,count,down[2],held[2],cursor;uint32_t now,nextSetup,keepUntil,nextDraw;float activity,budPhase;uint32_t changed,saveFailUntil;int sessionDirty;trip_guard::Guard trip;
  int level,pick,kept,parent,mutant,smear,dry;ctl::Link link;}; // pick/kept mirror the cursor and favourite count for the controllers
 int clamp(int x,int lo,int hi){return x<lo?lo:(x>hi?hi:x);}
 own_audio::Graph g_audio; // Guitar -> Mutation DSP -> Output, owned by the App
@@ -73,8 +74,21 @@ void label(uint16_t*px,uint32_t stride,int x,int y,const char*t,uint16_t ink){fo
 void number(uint16_t*px,uint32_t stride,int x,int y,int n,uint16_t ink){n=clamp(n,0,100);if(n==100){glyph(px,stride,x,y,digit_alpha+1288,28,46,ink);x+=19;n=0;}glyph(px,stride,x,y,digit_alpha+(n/10)*1288,28,46,ink);glyph(px,stride,x+24,y,digit_alpha+(n%10)*1288,28,46,ink);}
 void patch(uint16_t*px,uint32_t stride,int x,int y,int w,int h,int edge){for(int j=y;j<y+h&&j<172;++j){uint16_t c=art_pixel(j*320+edge);for(int i=x;i<x+w&&i<320;++i)px[j*stride+i]=c;}}
 void draw(State*s){uint16_t*px=nullptr;uint32_t stride=0;resona_ui*ui=P->screen_begin(&px,&stride);if(!ui||!px)return;art_copy(px,stride);
- // The selected cut-paper bud sways with input, while one immutable sprite keeps render cost bounded.
- const int sway=(int)(s->activity*3.0f);for(int y=29;y<107;++y){int shift=(y-107)*sway/78;for(int x=121;x<199;++x)px[y*stride+x]=art_pixel(y*320+x+shift);}
+ // Bend the central bud around its stem. Leave the title and side leaves outside the warp.
+ const float sway=8.0f*s->activity*resona_sinf(s->budPhase);
+ if(sway>.25f||sway<-.25f){
+  for(int y=28;y<115;++y){
+   const int left=y<37?145:117;
+   const int right=y<37?170:207;
+   const float offset=(115-y)*sway/87.0f;
+   for(int x=left;x<right;++x){
+    const int edge=x-left<right-1-x?x-left:right-1-x;
+    const float weight=edge<8?edge*.125f:1.0f;
+    const int shift=(int)(offset*weight+(offset<0?-.5f:.5f));
+    px[y*stride+x]=art_pixel(y*320+x+shift);
+   }
+  }
+ }
  const uint16_t ink=RESONA_RGB(35,18,43),cream=RESONA_RGB(249,242,196);
  patch(px,stride,4,126,67,46,0);number(px,stride,7,126,blendNow(s),ink);
  patch(px,stride,253,0,67,40,319); // strain displayed smaller than blend, leaving the title intact
@@ -112,7 +126,23 @@ void event(void*state,const resona_app_event*ev){ if(demo_capture::event(P,ev))r
 void frame(void*state,uint32_t ms){ if(demo_capture::paused(P))return;State*s=static_cast<State*>(state);s->now+=ms;setup(s);
  if(s->sessionDirty&&s->now-s->changed>1500){Session ses={kSessionMagic,sizeof(Session),s->a,s->b,s->blend,s->strain,s->saved.seed,s->level};s->sessionDirty=0;if(P->app_store_write(kSessionAt,&ses,sizeof ses)<0)s->saveFailUntil=s->now+1500;}
 s->pick=s->cursor+1;s->kept=(int)s->saved.count;ctl::sync(P,s->link,kBind,kBinds,s->now);
-uint8_t in=0;P->meters(&in,nullptr,nullptr);float target=(float)in/9;s->activity+=(target-s->activity)*(target>s->activity?.45f:.12f);if(s->now%80<ms)draw(s);}
+ uint8_t in=0;P->meters(&in,nullptr,nullptr);
+ const float target=(float)clamp(in,0,9)/9.0f;
+ const float elapsed=(float)ms;
+ const float response=target>s->activity?24.0f:170.0f;
+ s->activity+=(target-s->activity)*elapsed/(response+elapsed);
+ if(s->activity<.015f){
+  s->activity=0;
+  s->budPhase=0;
+ }else{
+  s->budPhase+=.018f*elapsed;
+  s->budPhase-=6.2831853f*(uint32_t)(s->budPhase/6.2831853f);
+ }
+ if((int32_t)(s->now-s->nextDraw)>=0){
+  s->nextDraw=s->now+(s->activity>0?33:80);
+  draw(s);
+ }
+}
 const resona_app app={RESONA_PLATFORM_VERSION,sizeof(resona_app),RESONA_APP_ID,RESONA_APP_NAME,RESONA_APP_VERSION,sizeof(State),1024,init,event,frame};
 }
 extern "C" const resona_app*resona_app_get(){return &app;}

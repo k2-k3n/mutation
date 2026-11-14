@@ -5,11 +5,11 @@
     "file": "App.rpk",
     "id": "org.resona.demo.mutation",
     "name": "Mutation",
-    "version": "0.2.1",
+    "version": "0.2.9",
     "kind": 1,
-    "bytes": 159636,
-    "sha256": "4781995c817d8ed000c263f3c1da715daa9156fa20a7eb5b3540db4753b294f3",
-    "crc32": 3071110257
+    "bytes": 160148,
+    "sha256": "c111c7c599b8096c7596827a8e034a31b3d2c4656654b93d365103d0e48f9783",
+    "crc32": 3845218950
   },
   "audio_packs": [
     {
